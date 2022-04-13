@@ -31,7 +31,35 @@ enum ncclProxyProfileState {
   ncclProxyProfileAppendEnd = 25
 };
 
-ncclResult_t ncclProfilingRecord(struct ncclProxyArgs* args, int sub, int step, int state);
+void ncclProfilingRecord_(struct ncclProxyArgs* args, int sub, int step, int state);
 void ncclProfilingDump();
+
+#if USDT
+#include <sys/sdt.h>
+#define USDT_PROV(s) #s
+#define USDT_PROBE0(name) DTRACE_PROBE(USDT_PROV(nccl), name)
+#define USDT_PROBE1(name, a1) DTRACE_PROBE1(USDT_PROV(nccl), name, a1)
+#define USDT_PROBE2(name, a1, a2) DTRACE_PROBE2(USDT_PROV(nccl), name, a1, a2)
+#define USDT_PROBE6(name, a1, a2, a3, a4, a5, a6) DTRACE_PROBE6(USDT_PROV(nccl), name, a1, a2, a3, a4, a5, a6)
+#define ncclProfilingRecord(args, sub, step, state) \
+  do { \
+    if ((state) == ncclProxyProfileAppendEnd) { \
+      USDT_PROBE1(ncclProxyProfileAppendEnd, (args)->opCount); \
+    } else if ((state) == ncclProxyProfileBegin) { \
+      USDT_PROBE6(ncclProxyProfileBegin, (sub), (step), (args)->subs[sub].channelId, (args)->pattern, (args)->subs[sub].peer, (args)->opCount); \
+    } else if ((state) <= ncclProxyProfileEnd) { \
+      USDT_PROBE2(state, (sub), (step)); \
+    } else { \
+      USDT_PROBE0(state); \
+    } \
+    ncclProfilingRecord_((args), (sub), (step), (state)); \
+  } while (0)
+#else
+#define USDT_PROBE0(name)
+#define USDT_PROBE1(name, a1)
+#define USDT_PROBE2(name, a1, a2)
+#define USDT_PROBE6(name, a1, a2, a3, a4, a5, a6)
+#define ncclProfilingRecord ncclProfilingRecord_
+#endif
 
 #endif

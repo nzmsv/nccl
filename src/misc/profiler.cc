@@ -29,7 +29,7 @@ int profilingIndex = 0;
 double profilingStart = 0;
 #define MAX_EVENTS 200000
 
-ncclResult_t ncclProfilingRecord(struct ncclProxyArgs* args, int sub, int step, int state) {
+void ncclProfilingRecord_(struct ncclProxyArgs* args, int sub, int step, int state) {
   if (profilingEvents == NULL) {
     NCCLCHECK(ncclCalloc(&profilingEvents, MAX_EVENTS));
     profilingStart = gettime();
@@ -54,7 +54,6 @@ ncclResult_t ncclProfilingRecord(struct ncclProxyArgs* args, int sub, int step, 
   }
   // Timestamp
   event->timestamp[state%8] = gettime()-profilingStart;
-  return ncclSuccess;
 }
 
 void ncclProfilingDump() {
@@ -110,6 +109,6 @@ void ncclProfilingDump() {
   free(profilingEvents);
 }
 #else
-ncclResult_t ncclProfilingRecord(struct ncclProxyArgs* args, int sub, int step, int state) { return ncclSuccess; }
+void ncclProfilingRecord_(struct ncclProxyArgs* args, int sub, int step, int state) {}
 void ncclProfilingDump() {}
 #endif

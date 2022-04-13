@@ -11,6 +11,7 @@ KEEP ?= 0
 DEBUG ?= 0
 TRACE ?= 0
 PROFAPI ?= 0
+USDT ?= 0
 NVTX ?= 1
 
 NVCC = $(CUDA_HOME)/bin/nvcc
@@ -97,4 +98,8 @@ endif
 
 ifneq ($(PROFAPI), 0)
 CXXFLAGS += -DPROFAPI
+endif
+
+ifneq ($(USDT), 0)
+CXXFLAGS += -DUSDT
 endif
