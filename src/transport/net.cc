@@ -236,30 +236,30 @@ static ncclResult_t netCreateShm(struct connectMapMem* mem) {
 }
 
 static ncclResult_t netDumpMap(struct connectMap* map) {
-  printf("Dump map same process %d shared %d\n", map->sameProcess, map->shared);
+  TRACE(NCCL_NET, "Dump map same process %d shared %d", map->sameProcess, map->shared);
   struct connectMapMem *mem = map->mems+NCCL_NET_MAP_HOSTMEM;
-  printf("Mem 0: Host mem %s (%x B) CPU %p GPU %p\n", mem->shmPath, mem->size, mem->cpuPtr, mem->gpuPtr);
+  TRACE(NCCL_NET, "Mem 0: Host mem %s (%x B) CPU %p GPU %p", mem->shmPath, mem->size, mem->cpuPtr, mem->gpuPtr);
   mem = map->mems+NCCL_NET_MAP_DEVMEM;
-  printf("Mem 1: Vid  mem (%x B) CPU %p GPU %p\n", mem->size, mem->cpuPtr, mem->gpuPtr);
+  TRACE(NCCL_NET, "Mem 1: Vid  mem (%x B) CPU %p GPU %p", mem->size, mem->cpuPtr, mem->gpuPtr);
   mem = map->mems+NCCL_NET_MAP_SHARED_HOSTMEM;
-  printf("Mem 2: Shared Host mem %s (%x B) CPU %p GPU %p\n", mem->shmPath, mem->size, mem->cpuPtr, mem->gpuPtr);
+  TRACE(NCCL_NET, "Mem 2: Shared Host mem %s (%x B) CPU %p GPU %p", mem->shmPath, mem->size, mem->cpuPtr, mem->gpuPtr);
   mem = map->mems+NCCL_NET_MAP_SHARED_DEVMEM;
-  printf("Mem 3: Shared Vid mem (%x B) CPU %p GPU %p\n", mem->size, mem->cpuPtr, mem->gpuPtr);
-  printf("SendMem -> Used %d Bank %d Offset %x, cpu %p gpu %p\n",
+  TRACE(NCCL_NET, "Mem 3: Shared Vid mem (%x B) CPU %p GPU %p", mem->size, mem->cpuPtr, mem->gpuPtr);
+  TRACE(NCCL_NET, "SendMem -> Used %d Bank %d Offset %x, cpu %p gpu %p",
       map->offsets.sendMem & NCCL_NET_MAP_MASK_USED ? 1 : 0,
       NCCL_NET_MAP_OFFSET_BANK(map, sendMem), map->offsets.sendMem & NCCL_NET_MAP_MASK_OFFSET,
       NCCL_NET_MAP_GET_POINTER(map, cpu, sendMem), NCCL_NET_MAP_GET_POINTER(map, gpu, sendMem));
-  printf("RecvMem -> Used %d Bank %d Offset %x, cpu %p gpu %p\n",
+  TRACE(NCCL_NET, "RecvMem -> Used %d Bank %d Offset %x, cpu %p gpu %p",
       map->offsets.recvMem & NCCL_NET_MAP_MASK_USED ? 1 : 0,
       NCCL_NET_MAP_OFFSET_BANK(map, recvMem), map->offsets.recvMem & NCCL_NET_MAP_MASK_OFFSET,
       NCCL_NET_MAP_GET_POINTER(map, cpu, recvMem), NCCL_NET_MAP_GET_POINTER(map, gpu, recvMem));
   for (int p=0; p<NCCL_NUM_PROTOCOLS; p++) {
-    printf("Proto %d -> Used %d Bank %d Offset %x, cpu %p, gpu %p\n", p,
+    TRACE(NCCL_NET, "Proto %d -> Used %d Bank %d Offset %x, cpu %p, gpu %p", p,
         map->offsets.buffs[p] & NCCL_NET_MAP_MASK_USED ? 1 : 0,
         NCCL_NET_MAP_OFFSET_BANK(map, buffs[p]), map->offsets.buffs[p] & NCCL_NET_MAP_MASK_OFFSET,
         NCCL_NET_MAP_GET_POINTER(map, cpu, buffs[p]), NCCL_NET_MAP_GET_POINTER(map, gpu, buffs[p]));
   }
-  printf("End of dump\n");
+  TRACE(NCCL_NET, "End of map dump\n");
   return ncclSuccess;
 }
 
@@ -296,7 +296,7 @@ static ncclResult_t sendConnect(struct ncclComm* comm, struct ncclConnect* conne
       map->mems[NCCL_NET_MAP_SHARED_DEVMEM].cpuPtr = NULL;
     }
   }
-  //NCCLCHECK(netDumpMap(map));
+  NCCLCHECK(netDumpMap(map));
 
   struct ncclSendMem *sendMem = (struct ncclSendMem*) NCCL_NET_MAP_GET_POINTER(map, gpu, sendMem);
   void* gdcMem = map->mems[NCCL_NET_MAP_GDCMEM].gpuPtr;
@@ -319,7 +319,7 @@ static ncclResult_t recvConnect(struct ncclComm* comm, struct ncclConnect* conne
   NCCLCHECK(ncclCalloc(&map, 1));
   recv->transportResources = map;
   NCCLCHECK(ncclProxyCall(&recv->proxyConn, ncclProxyMsgConnect, connectInfo, sizeof(int), map, sizeof(struct connectMap)));
-  //NCCLCHECK(netDumpMap(map));
+  NCCLCHECK(netDumpMap(map));
 
   struct ncclSendMem *sendMem = (struct ncclSendMem*) NCCL_NET_MAP_GET_POINTER(map, gpu, sendMem);
   recv->conn.head = &sendMem->head;
@@ -620,7 +620,7 @@ static ncclResult_t sendProxyConnect(struct ncclProxyConnection* connection, str
     }
   }
 
-  //NCCLCHECK(netDumpMap(map));
+  NCCLCHECK(netDumpMap(map));
   if (respSize != sizeof(struct connectMap)) return ncclInternalError;
   memcpy(respBuff, map, sizeof(struct connectMap));
   return ncclSuccess;
@@ -743,7 +743,7 @@ static ncclResult_t recvProxyConnect(struct ncclProxyConnection* connection, str
     }
   }
 
-  //NCCLCHECK(netDumpMap(map));
+  NCCLCHECK(netDumpMap(map));
   if (respSize != sizeof(struct connectMap)) return ncclInternalError;
   memcpy(respBuff, map, sizeof(struct connectMap));
   return ncclSuccess;
