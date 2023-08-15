@@ -6,7 +6,7 @@
 
 #include "profiler.h"
 
-//#define PROFILE_PROXY 1
+#define PROFILE_PROXY 1
 #ifdef PROFILE_PROXY
 #include "timer.h"
 #include "alloc.h"
