@@ -45,7 +45,7 @@ struct ncclPeerInfo {
   int cudaCompCap;
 };
 
-#define CONNECT_SIZE 128
+#define CONNECT_SIZE 1024
 struct ncclConnect {
   char data[CONNECT_SIZE];
 };
