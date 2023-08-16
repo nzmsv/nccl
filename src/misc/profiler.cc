@@ -69,13 +69,13 @@ void ncclProfilingDump() {
   for (int i=0; i<profilingIndex; i++) {
     struct ncclProxyProfileEvent* e = profilingEvents+i;
     const int sendrecv = e->peer >= 0;
-    const char* typeStr = sendrecv ? (e->type == ncclPatternSend ? "Send" : "Recv") :
+    const char* typeStr = sendrecv ? (e->type == ncclPatternRecv ? "Recv" : "Send") :
       profilingEventStr[-(e->peer/8)];
 
 
     if (sendrecv) {
       int state = ncclProxyProfileBegin;
-      const char** stateStr = e->type == ncclPatternSend ? profilingStateSendStr : profilingStateRecvStr;
+      const char** stateStr = e->type == ncclPatternRecv ? profilingStateRecvStr : profilingStateSendStr;
       fprintf(f, "{\"name\": \"%s-%d-%d\", \"cat\": \"NET\", \"ph\": \"b\", \"id\": %d, \"pid\": %d, \"tid\": 1, \"ts\": %f, \"args\": { \"opCount\": %ld, \"proxyOpIndex\":%d } },\n",
           typeStr, e->peer, e->step, i, e->channel, e->timestamp[state], e->opCount, e->opIndex);
 
