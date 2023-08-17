@@ -82,7 +82,7 @@ NVCUFLAGS += -O3
 CXXFLAGS  += -O3 -g
 else
 NVCUFLAGS += -O0 -G -g
-CXXFLAGS  += -O0 -g -ggdb3
+CXXFLAGS  += -O0 -g -ggdb3 -rdynamic
 endif
 
 ifneq ($(VERBOSE), 0)
