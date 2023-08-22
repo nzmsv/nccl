@@ -22,6 +22,11 @@ struct ncclProxyProfileEvent {
   uint16_t channel;
   uint8_t type; // send / recv
   uint8_t opIndex;
+  uint8_t sliceSteps;
+  uint8_t chunkSteps;
+  uint16_t chunkSize;
+  uint8_t nsteps;
+  uint16_t nbytes;
 };
 
 struct ncclProxyProfileEvent* profilingEvents = NULL;
@@ -46,6 +51,11 @@ ncclResult_t ncclProfilingRecord(struct ncclProxyArgs* args, int sub, int step, 
       event->type = args->pattern;
       event->step = step;
       event->opIndex = (((uint64_t)args)/sizeof(struct ncclProxyArgs))%256;
+      event->sliceSteps = args->sliceSteps;
+      event->chunkSteps = args->chunkSteps;
+      event->chunkSize = args->chunkSize;
+      event->nsteps = args->subs[sub].nsteps;
+      event->nbytes = args->subs[sub].nbytes;
     } else event->peer = -state;
   } else {
     event = (struct ncclProxyProfileEvent*)args->subs[sub].profilingEvents[step%NCCL_STEPS];
@@ -76,8 +86,8 @@ void ncclProfilingDump() {
     if (sendrecv) {
       int state = ncclProxyProfileBegin;
       const char** stateStr = e->type == ncclPatternRecv ? profilingStateRecvStr : profilingStateSendStr;
-      fprintf(f, "{\"name\": \"%s-%d-%d\", \"cat\": \"NET\", \"ph\": \"b\", \"id\": %d, \"pid\": %d, \"tid\": 1, \"ts\": %f, \"args\": { \"opCount\": %ld, \"proxyOpIndex\":%d } },\n",
-          typeStr, e->peer, e->step, i, e->channel, e->timestamp[state], e->opCount, e->opIndex);
+      fprintf(f, "{\"name\": \"%s-%d-%d\", \"cat\": \"NET\", \"ph\": \"b\", \"id\": %d, \"pid\": %d, \"tid\": 1, \"ts\": %f, \"args\": { \"opCount\": %ld, \"proxyOpIndex\":%d, \"sliceSteps\":%d, \"chunkSteps\":%d, \"chunkSize\":%d, \"nsteps\":%d, \"nbytes\":%d } },\n",
+          typeStr, e->peer, e->step, i, e->channel, e->timestamp[state], (long)e->opCount, (int)e->opIndex, (int)e->sliceSteps, (int)e->chunkSteps, (int)e->chunkSize, (int)e->nsteps, (int)e->nbytes);
 
       while (state<ncclProxyProfileEnd) {
         if (e->timestamp[state]) {
