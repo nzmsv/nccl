@@ -90,7 +90,7 @@ void ncclProfilingDump() {
     if (sendrecv) {
       int state = ncclProxyProfileBegin;
       const char** stateStr = e->type == ncclPatternRecv ? profilingStateRecvStr : profilingStateSendStr;
-      fprintf(f, "{\"name\": \"%s-%d-%d\", \"cat\": \"NET\", \"ph\": \"b\", \"id\": %d, \"pid\": %d, \"tid\": 1, \"ts\": %f, \"args\": { \"opCount\": %ld, \"proxyOpIndex\":%d, \"sliceSteps\":%d, \"chunkSteps\":%d, \"chunkSize\":%d, \"nsteps\":%d, \"nbytes\":%d } },\n",
+      fprintf(f, "{\"name\": \"%s\", \"peer\": %d, \"step\": %d, \"cat\": \"NET\", \"ph\": \"b\", \"id\": %d, \"pid\": %d, \"tid\": 1, \"ts\": %f, \"args\": { \"opCount\": %ld, \"proxyOpIndex\":%d, \"sliceSteps\":%d, \"chunkSteps\":%d, \"chunkSize\":%d, \"nsteps\":%d, \"nbytes\":%d } },\n",
           typeStr, e->peer, e->step, i, e->channel, e->timestamp[state], (long)e->opCount, (int)e->opIndex, (int)e->sliceSteps, (int)e->chunkSteps, (int)e->chunkSize, (int)e->nsteps, (int)e->nbytes);
 
       while (state<ncclProxyProfileEnd) {
@@ -105,7 +105,7 @@ void ncclProfilingDump() {
         }
       }
 
-      fprintf(f, "{\"name\": \"%s-%d-%d\", \"cat\": \"NET\", \"ph\": \"e\", \"id\": %d, \"pid\": %d, \"tid\": 1, \"ts\": %f },\n",
+      fprintf(f, "{\"name\": \"%s\", \"peer\": %d, \"step\": %d, \"cat\": \"NET\", \"ph\": \"e\", \"id\": %d, \"pid\": %d, \"tid\": 1, \"ts\": %f },\n",
           typeStr, e->peer, e->step, i, e->channel, e->timestamp[state]);
     } else {
       if (e->peer == -ncclProxyProfileAppend) {
