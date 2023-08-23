@@ -31,9 +31,10 @@ struct ncclProxyProfileEvent {
 };
 
 struct ncclProxyProfileEvent* profilingEvents = NULL;
-int profilingIndex = 0;
+unsigned long profilingIndex = 0;
 double profilingStart = 0;
 #define MAX_EVENTS 200000
+static_assert(MAX_EVENTS <= std::numeric_limits<decltype(profilingIndex)>::max(), "MAX_EVENTS too large");
 
 static const char *ncclCollName(int coll) {
   return (coll < NCCL_NUM_FUNCTIONS) ? ncclFuncStr[coll] : "";
@@ -85,7 +86,11 @@ void ncclProfilingDump() {
   if (dumpDone) return;
   dumpDone = 1;
   const char* str = getenv("NCCL_PROXY_PROFILE");
-  if (!str) { free(profilingEvents); return; }
+  if (!str) {
+    free(profilingEvents);
+    profilingEvents = NULL;
+    return;
+  }
   FILE* f = fopen(str, "w");
   fprintf(f, "[\n");
 
@@ -130,7 +135,7 @@ void ncclProfilingDump() {
   }
   fprintf(f, "{} ]\n");
   fclose(f);
-  free(profilingEvents);
+  //free(profilingEvents);
 }
 #else
 ncclResult_t ncclProfilingRecord(struct ncclProxyArgs* args, int sub, int step, int state) { return ncclSuccess; }
