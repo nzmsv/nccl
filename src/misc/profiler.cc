@@ -62,7 +62,11 @@ void ncclProfilingDump() {
   if (dumpDone) return;
   dumpDone = 1;
   const char* str = getenv("NCCL_PROXY_PROFILE");
-  if (!str) { free(profilingEvents); return; }
+  if (!str) {
+    free(profilingEvents);
+    profilingEvents = NULL;
+    return;
+  }
   FILE* f = fopen(str, "w");
   fprintf(f, "[\n");
 
@@ -107,7 +111,7 @@ void ncclProfilingDump() {
   }
   fprintf(f, "{} ]\n");
   fclose(f);
-  free(profilingEvents);
+  //free(profilingEvents);
 }
 #else
 ncclResult_t ncclProfilingRecord(struct ncclProxyArgs* args, int sub, int step, int state) { return ncclSuccess; }
