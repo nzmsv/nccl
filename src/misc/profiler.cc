@@ -20,7 +20,9 @@ struct ncclProxyProfileEvent {
   int peer;
   int step;
   uint16_t channel;
+  uint64_t /*ncclComm_t*/ comm;
   uint8_t type; // send / recv
+  uint8_t /*ncclFunc_t*/ coll;
   uint8_t opIndex;
   uint8_t sliceSteps;
   uint8_t chunkSteps;
@@ -32,6 +34,10 @@ struct ncclProxyProfileEvent* profilingEvents = NULL;
 int profilingIndex = 0;
 double profilingStart = 0;
 #define MAX_EVENTS 200000
+
+static const char *ncclCollName(int coll) {
+  return (coll < NCCL_NUM_FUNCTIONS) ? ncclFuncStr[coll] : "";
+}
 
 ncclResult_t ncclProfilingRecord(struct ncclProxyArgs* args, int sub, int step, int state) {
   if (profilingEvents == NULL) {
@@ -48,6 +54,8 @@ ncclResult_t ncclProfilingRecord(struct ncclProxyArgs* args, int sub, int step, 
       event->channel = args->subs[sub].channelId;
       event->peer = args->subs[sub].peer;
       event->type = args->pattern;
+      event->comm = args->comm;
+      event->coll = args->coll - NCCL_NUM_FUNCTIONS;
       event->step = step;
       event->opIndex = (((uint64_t)args)/sizeof(struct ncclProxyArgs))%256;
       event->sliceSteps = args->sliceSteps;
@@ -91,8 +99,8 @@ void ncclProfilingDump() {
     if (sendrecv) {
       int state = ncclProxyProfileBegin;
       const char** stateStr = e->type == ncclPatternRecv ? profilingStateRecvStr : profilingStateSendStr;
-      fprintf(f, "{\"name\": \"%s-%d-%d\", \"cat\": \"NET\", \"ph\": \"b\", \"id\": %d, \"pid\": %d, \"tid\": 1, \"ts\": %f, \"args\": { \"coll\": \"%s\", \"peer\": %d, \"step\": %d, \"opCount\": %ld, \"proxyOpIndex\": %d, \"sliceSteps\": %u, \"chunkSteps\": %u, \"nsteps\": %d, \"chunkSize\": %lu, \"comm\": \"0x%lx\"} },\n",
-          typeStr, e->peer, e->step, i, e->channel, e->timestamp[state], ncclCollName(e->coll), e->peer, e->step, (long)e->opCount, (int)e->opIndex, (unsigned)e->sliceSteps, (unsigned)e->chunkSteps, (unsigned)e->nsteps, e->chunkSize, e->comm);
+      fprintf(f, "{\"name\": \"%s-%d-%d\", \"cat\": \"NET\", \"ph\": \"b\", \"id\": %d, \"pid\": %d, \"tid\": 1, \"ts\": %f, \"args\": { \"coll\": \"%s\", \"peer\": %d, \"step\": %d, \"opCount\": %ld, \"proxyOpIndex\": %d, \"sliceSteps\": %d, \"chunkSteps\": %d, \"chunkSize\": %d, \"comm\": \"0x%lx\"} },\n",
+          typeStr, e->peer, e->step, i, e->channel, e->timestamp[state], ncclCollName(e->coll), e->peer, e->step, (long)e->opCount, (int)e->opIndex, e->sliceSteps, e->chunkSteps, e->chunkSize, e->comm);
 
       while (state<ncclProxyProfileEnd) {
         if (e->timestamp[state]) {
