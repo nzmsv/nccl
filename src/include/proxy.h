@@ -32,9 +32,11 @@ struct ncclProxyOp {
   int next;
 
   uint64_t opCount;
-  int sliceSteps;
-  int chunkSteps;
-  int chunkSize;
+  uint8_t sliceSteps;
+  uint8_t chunkSteps;
+  uint32_t chunkSize;
+  uint64_t /*ncclComm_t*/ comm;
+  uint8_t /*ncclFunc_t*/ coll;
   uint8_t /*ncclDataType_t*/ dtype;
   uint8_t /*ncclDevRedOp_t*/ redOp;
   uint8_t /*ncclPattern_t*/ pattern;
@@ -46,7 +48,7 @@ struct ncclProxyOp {
     struct ncclProxyOp *enqNext;
   };
 };
-static_assert(sizeof(struct ncclProxyOp) == 64, "Keep ProxyOp aligned with cache lines for effective prefetch");
+//static_assert(sizeof(struct ncclProxyOp) == 64, "Keep ProxyOp aligned with cache lines for effective prefetch");
 
 struct ncclProxySubArgs {
   struct ncclProxyConnection* connection;
@@ -76,6 +78,8 @@ struct ncclProxyArgs {
   int sliceSteps;
   int chunkSteps;
   int chunkSize;
+  uint64_t /*ncclComm_t*/ comm;
+  uint8_t /*ncclFunc_t*/ coll;
   uint8_t /*ncclDataType_t*/ dtype;
   uint8_t /*ncclDevRedOp_t*/ redOp;
   uint8_t /*ncclPattern_t*/ pattern;

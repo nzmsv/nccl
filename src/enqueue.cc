@@ -1378,6 +1378,8 @@ comp_next:
   proxyOp->sliceSteps = sliceSteps;
   proxyOp->chunkSteps = chunkSteps;
   proxyOp->chunkSize = chunkSize;
+  proxyOp->comm = (uintptr_t)(info->comm);
+  proxyOp->coll = info->coll + NCCL_NUM_FUNCTIONS;
   proxyOp->protocol = info->protocol;
   proxyOp->dtype = info->datatype;
   proxyOp->redOp = info->opFull.op==ncclDevPreMulSum || info->opFull.op==ncclDevSumPostDiv ? ncclSum : // Network sees avg as sum

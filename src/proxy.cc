@@ -377,6 +377,8 @@ static ncclResult_t ncclProxyOpToArgs(struct ncclProxyOp* op, struct ncclProxyAr
   args->sliceSteps = op->sliceSteps;
   args->chunkSteps = op->chunkSteps;
   args->chunkSize = op->chunkSize;
+  args->comm = op->comm;
+  args->coll = op->coll;
   args->dtype = op->dtype;
   args->redOp = op->redOp;
   args->pattern = op->pattern;
