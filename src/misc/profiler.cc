@@ -25,9 +25,10 @@ struct ncclProxyProfileEvent {
 };
 
 struct ncclProxyProfileEvent* profilingEvents = NULL;
-int profilingIndex = 0;
+unsigned long profilingIndex = 0;
 double profilingStart = 0;
 #define MAX_EVENTS 200000
+static_assert(MAX_EVENTS <= std::numeric_limits<decltype(profilingIndex)>::max(), "MAX_EVENTS too large");
 
 ncclResult_t ncclProfilingRecord(struct ncclProxyArgs* args, int sub, int step, int state) {
   if (profilingEvents == NULL) {
