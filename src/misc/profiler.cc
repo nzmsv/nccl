@@ -46,7 +46,6 @@ ncclResult_t ncclProfilingRecord(struct ncclProxyArgs* args, int sub, int step, 
   }
   struct ncclProxyProfileEvent* event = NULL;
   if (state%8 == 0) {
-    args->subs[sub].profilingEvents[step%NCCL_STEPS] = NULL;
     if (profilingIndex == MAX_EVENTS) return ncclSuccess;
     args->subs[sub].profilingEvents[step%NCCL_STEPS] = event = profilingEvents+profilingIndex++;
     if (state == ncclProxyProfileBegin) {
@@ -66,6 +65,7 @@ ncclResult_t ncclProfilingRecord(struct ncclProxyArgs* args, int sub, int step, 
   } else {
     event = (struct ncclProxyProfileEvent*)args->subs[sub].profilingEvents[step%NCCL_STEPS];
     if (state == ncclProxyProfileEnd) args->subs[sub].profilingEvents[step%NCCL_STEPS] = NULL;
+    if (!event) return ncclSuccess;
     if (state == ncclProxyProfileAppendEnd) {
       event->opCount = args->opCount;
     }
@@ -73,6 +73,7 @@ ncclResult_t ncclProfilingRecord(struct ncclProxyArgs* args, int sub, int step, 
       event->chunkSize = args->subs[sub].nbytes;
     }
   }
+  if (!event) return ncclSuccess;
   // Timestamp
   event->timestamp[state%8] = gettime()-profilingStart;
   return ncclSuccess;
