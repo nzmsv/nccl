@@ -102,7 +102,7 @@ void ncclProfilingDump() {
     if (sendrecv) {
       int state = ncclProxyProfileBegin;
       const char** stateStr = e->type == ncclPatternRecv ? profilingStateRecvStr : profilingStateSendStr;
-      fprintf(f, "{\"name\": \"%s-%d-%d\", \"cat\": \"NET\", \"ph\": \"b\", \"id\": %d, \"pid\": %d, \"tid\": 1, \"ts\": %f, \"args\": { \"coll\": \"%s\", \"peer\": %d, \"step\": %d, \"opCount\": %ld, \"proxyOpIndex\": %d, \"sliceSteps\": %d, \"chunkSteps\": %d, \"chunkSize\": %d, \"comm\": 0x%lx} },\n",
+      fprintf(f, "{\"name\": \"%s-%d-%d\", \"cat\": \"NET\", \"ph\": \"b\", \"id\": %d, \"pid\": %d, \"tid\": 1, \"ts\": %f, \"args\": { \"coll\": \"%s\", \"peer\": %d, \"step\": %d, \"opCount\": %ld, \"proxyOpIndex\": %d, \"sliceSteps\": %d, \"chunkSteps\": %d, \"chunkSize\": %d, \"comm\": \"0x%lx\"} },\n",
           typeStr, e->peer, e->step, i, e->channel, e->timestamp[state], ncclCollName(e->coll), e->peer, e->step, (long)e->opCount, (int)e->opIndex, e->sliceSteps, e->chunkSteps, e->chunkSize, e->comm);
 
       while (state<ncclProxyProfileEnd) {
