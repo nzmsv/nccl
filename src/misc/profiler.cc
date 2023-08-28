@@ -24,9 +24,10 @@ struct ncclProxyProfileEvent {
   uint8_t type; // send / recv
   uint8_t /*ncclFunc_t*/ coll;
   uint8_t opIndex;
-  int sliceSteps;
-  int chunkSteps;
-  int chunkSize;
+  uint8_t sliceSteps;
+  uint8_t chunkSteps;
+  uint8_t nsteps;
+  size_t chunkSize;
 };
 
 struct ncclProxyProfileEvent* profilingEvents = NULL;
@@ -60,6 +61,7 @@ ncclResult_t ncclProfilingRecord(struct ncclProxyArgs* args, int sub, int step, 
       event->opIndex = (((uint64_t)args)/sizeof(struct ncclProxyArgs))%256;
       event->sliceSteps = args->sliceSteps;
       event->chunkSteps = args->chunkSteps;
+      event->nsteps = args->subs[sub].nsteps;
       event->chunkSize = args->subs[sub].nbytes;
     } else event->peer = -state;
   } else {
@@ -102,8 +104,8 @@ void ncclProfilingDump() {
     if (sendrecv) {
       int state = ncclProxyProfileBegin;
       const char** stateStr = e->type == ncclPatternRecv ? profilingStateRecvStr : profilingStateSendStr;
-      fprintf(f, "{\"name\": \"%s-%d-%d\", \"cat\": \"NET\", \"ph\": \"b\", \"id\": %d, \"pid\": %d, \"tid\": 1, \"ts\": %f, \"args\": { \"coll\": \"%s\", \"peer\": %d, \"step\": %d, \"opCount\": %ld, \"proxyOpIndex\": %d, \"sliceSteps\": %d, \"chunkSteps\": %d, \"chunkSize\": %d, \"comm\": \"0x%lx\"} },\n",
-          typeStr, e->peer, e->step, i, e->channel, e->timestamp[state], ncclCollName(e->coll), e->peer, e->step, (long)e->opCount, (int)e->opIndex, e->sliceSteps, e->chunkSteps, e->chunkSize, e->comm);
+      fprintf(f, "{\"name\": \"%s-%d-%d\", \"cat\": \"NET\", \"ph\": \"b\", \"id\": %d, \"pid\": %d, \"tid\": 1, \"ts\": %f, \"args\": { \"coll\": \"%s\", \"peer\": %d, \"step\": %d, \"opCount\": %ld, \"proxyOpIndex\": %d, \"sliceSteps\": %u, \"chunkSteps\": %u, \"nsteps\": %d, \"chunkSize\": %lu, \"comm\": \"0x%lx\"} },\n",
+          typeStr, e->peer, e->step, i, e->channel, e->timestamp[state], ncclCollName(e->coll), e->peer, e->step, (long)e->opCount, (int)e->opIndex, (unsigned)e->sliceSteps, (unsigned)e->chunkSteps, (unsigned)e->nsteps, e->chunkSize, e->comm);
 
       while (state<ncclProxyProfileEnd) {
         if (e->timestamp[state]) {
