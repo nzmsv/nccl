@@ -1,143 +1,26 @@
-/*************************************************************************
- * Copyright (c) 2022, NVIDIA CORPORATION. All rights reserved.
- *
- * See LICENSE.txt for license information
- ************************************************************************/
-
 #include "profiler.h"
 
-#define PROFILE_PROXY 1
-#ifdef PROFILE_PROXY
-#include "timer.h"
-#include "alloc.h"
+#include <sys/sdt.h>
+#define USDT_PROBE12(name, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12) \
+	DTRACE_PROBE12(nccl, name, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12)
 
-static const char* profilingStateSendStr[] = { "BufferWait", "GPUWait", "SendWait", "", "End" };
-static const char* profilingStateRecvStr[] = { "BufferWait", "RecvWait", "FlushWait", "GPUWait", "End" };
-static const char* profilingEventStr[] = { "SendRecv", "Sleep", "Idle", "Append" };
-struct ncclProxyProfileEvent {
-  double timestamp[6];
-  uint64_t opCount;
-  int peer;
-  int step;
-  uint16_t channel;
-  uint64_t /*ncclComm_t*/ comm;
-  uint8_t type; // send / recv
-  uint8_t /*ncclFunc_t*/ coll;
-  uint8_t opIndex;
-  uint8_t sliceSteps;
-  uint8_t chunkSteps;
-  uint8_t nsteps;
-  size_t chunkSize;
-};
-
-struct ncclProxyProfileEvent* profilingEvents = NULL;
-unsigned long profilingIndex = 0;
-double profilingStart = 0;
-#define MAX_EVENTS 200000
-static_assert(MAX_EVENTS <= std::numeric_limits<decltype(profilingIndex)>::max(), "MAX_EVENTS too large");
-
-static const char *ncclCollName(int coll) {
-  return (coll < NCCL_NUM_FUNCTIONS) ? ncclFuncStr[coll] : "";
-}
-
-ncclResult_t ncclProfilingRecord(struct ncclProxyArgs* args, int sub, int step, int state) {
-  if (profilingEvents == NULL) {
-    NCCLCHECK(ncclCalloc(&profilingEvents, MAX_EVENTS));
-    profilingStart = gettime();
+ncclResult_t ncclProfilingRecord(struct ncclProxyArgs* args, int sub, int step, enum ncclProxyProfileState state) {
+  if (state <= ncclProxyProfileRecvEnd) {
+    USDT_PROBE12(sendrecv,
+      state,
+      args->comm,
+      args->coll - NCCL_NUM_FUNCTIONS,
+      args->opCount,
+      args->subs[sub].peer,
+      step,
+      args->subs[sub].channelId,
+      args->sliceSteps,
+      args->chunkSteps,
+      args->chunkSize,
+      args->subs[sub].nsteps,
+      args->subs[sub].nbytes);
   }
-  struct ncclProxyProfileEvent* event = NULL;
-  if (state%8 == 0) {
-    if (profilingIndex == MAX_EVENTS) return ncclSuccess;
-    args->subs[sub].profilingEvents[step%NCCL_STEPS] = event = profilingEvents+profilingIndex++;
-    if (state == ncclProxyProfileBegin) {
-      // Proxy operation information
-      event->opCount = args->opCount;
-      event->channel = args->subs[sub].channelId;
-      event->peer = args->subs[sub].peer;
-      event->type = args->pattern;
-      event->comm = args->comm;
-      event->coll = args->coll - NCCL_NUM_FUNCTIONS;
-      event->step = step;
-      event->opIndex = (((uint64_t)args)/sizeof(struct ncclProxyArgs))%256;
-      event->sliceSteps = args->sliceSteps;
-      event->chunkSteps = args->chunkSteps;
-      event->nsteps = args->subs[sub].nsteps;
-      event->chunkSize = args->subs[sub].nbytes;
-    } else event->peer = -state;
-  } else {
-    event = (struct ncclProxyProfileEvent*)args->subs[sub].profilingEvents[step%NCCL_STEPS];
-    if (state == ncclProxyProfileEnd) args->subs[sub].profilingEvents[step%NCCL_STEPS] = NULL;
-    if (!event) return ncclSuccess;
-    if (state == ncclProxyProfileAppendEnd) {
-      event->opCount = args->opCount;
-    }
-    if (state == ncclProxyProfileSendWait) {
-      event->chunkSize = args->subs[sub].nbytes;
-    }
-  }
-  if (!event) return ncclSuccess;
-  // Timestamp
-  event->timestamp[state%8] = gettime()-profilingStart;
   return ncclSuccess;
 }
 
-void ncclProfilingDump() {
-  static int dumpDone = 0;
-  if (dumpDone) return;
-  dumpDone = 1;
-  const char* str = getenv("NCCL_PROXY_PROFILE");
-  if (!str) {
-    free(profilingEvents);
-    profilingEvents = NULL;
-    return;
-  }
-  FILE* f = fopen(str, "w");
-  fprintf(f, "[\n");
-
-  for (int i=0; i<profilingIndex; i++) {
-    struct ncclProxyProfileEvent* e = profilingEvents+i;
-    const int sendrecv = e->peer >= 0;
-    const char* typeStr = sendrecv ? (e->type == ncclPatternRecv ? "Recv" : "Send") :
-      profilingEventStr[-(e->peer/8)];
-
-
-    if (sendrecv) {
-      int state = ncclProxyProfileBegin;
-      const char** stateStr = e->type == ncclPatternRecv ? profilingStateRecvStr : profilingStateSendStr;
-      fprintf(f, "{\"name\": \"%s-%d-%d\", \"cat\": \"NET\", \"ph\": \"b\", \"id\": %d, \"pid\": %d, \"tid\": 1, \"ts\": %f, \"args\": { \"coll\": \"%s\", \"peer\": %d, \"step\": %d, \"opCount\": %ld, \"proxyOpIndex\": %d, \"sliceSteps\": %u, \"chunkSteps\": %u, \"nsteps\": %d, \"chunkSize\": %lu, \"comm\": \"0x%lx\"} },\n",
-          typeStr, e->peer, e->step, i, e->channel, e->timestamp[state], ncclCollName(e->coll), e->peer, e->step, (long)e->opCount, (int)e->opIndex, (unsigned)e->sliceSteps, (unsigned)e->chunkSteps, (unsigned)e->nsteps, e->chunkSize, e->comm);
-
-      while (state<ncclProxyProfileEnd) {
-        if (e->timestamp[state]) {
-          const char* name = stateStr[state];
-          fprintf(f, "{\"name\": \"%s\", \"cat\": \"NET\", \"ph\": \"b\", \"id\": %d, \"pid\": %d, \"tid\": 1, \"ts\": %f },\n",
-              name, i, e->channel, e->timestamp[state]);
-          state++;
-          while (e->timestamp[state] == 0) state++;
-          fprintf(f, "{\"name\": \"%s\", \"cat\": \"NET\", \"ph\": \"e\", \"id\": %d, \"pid\": %d, \"tid\": 1, \"ts\": %f },\n",
-              name, i, e->channel, e->timestamp[state]);
-        }
-      }
-
-      fprintf(f, "{\"name\": \"%s-%d-%d\", \"cat\": \"NET\", \"ph\": \"e\", \"id\": %d, \"pid\": %d, \"tid\": 1, \"ts\": %f },\n",
-          typeStr, e->peer, e->step, i, e->channel, e->timestamp[state]);
-    } else {
-      if (e->peer == -ncclProxyProfileAppend) {
-      fprintf(f, "{\"name\": \"%s\", \"cat\": \"NET\", \"ph\": \"b\", \"id\": %d, \"pid\": -1, \"tid\": 1, \"ts\": %f, \"args\": { \"added\": %ld } },\n",
-          typeStr, i, e->timestamp[0], e->opCount);
-      } else {
-        fprintf(f, "{\"name\": \"%s\", \"cat\": \"NET\", \"ph\": \"b\", \"id\": %d, \"pid\": -1, \"tid\": 1, \"ts\": %f },\n",
-          typeStr, i, e->timestamp[0]);
-      }
-      fprintf(f, "{\"name\": \"%s\", \"cat\": \"NET\", \"ph\": \"e\", \"id\": %d, \"pid\": -1, \"tid\": 1, \"ts\": %f },\n",
-          typeStr, i, e->timestamp[1]);
-    }
-  }
-  fprintf(f, "{} ]\n");
-  fclose(f);
-  //free(profilingEvents);
-}
-#else
-ncclResult_t ncclProfilingRecord(struct ncclProxyArgs* args, int sub, int step, int state) { return ncclSuccess; }
 void ncclProfilingDump() {}
-#endif

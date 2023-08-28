@@ -908,7 +908,6 @@ static_assert(NCCL_STEPS <= NCCL_NET_MAX_REQUESTS, "Not enough net requests to c
 
 static ncclResult_t sendProxyProgress(struct ncclProxyState* proxyState, struct ncclProxyArgs* args) {
   if (args->state == ncclProxyOpReady) {
-    args->pattern = ncclPatternSend;
     for (int s=0; s<args->nsubs; s++) {
       struct ncclProxySubArgs* sub = args->subs+s;
       struct sendResources* resources = (struct sendResources*) (sub->connection->transportResources);
@@ -916,7 +915,7 @@ static ncclResult_t sendProxyProgress(struct ncclProxyState* proxyState, struct 
       sub->base = ROUNDUP(resources->step, args->chunkSteps);
       sub->posted = sub->transmitted = sub->done = 0;
       sub->peer = resources->tpRemoteRank;
-      for (int step=0; step<sub->nsteps; step++) ncclProfilingRecord(args, s, step, ncclProxyProfileBegin);
+      for (int step=0; step<sub->nsteps; step++) ncclProfilingRecord(args, s, step, ncclProxyProfileSendBegin);
     }
     args->state = ncclProxyOpProgress;
   }
@@ -947,7 +946,6 @@ static ncclResult_t sendProxyProgress(struct ncclProxyState* proxyState, struct 
           *sendHead = sub->base + sub->posted - NCCL_STEPS;
           if (resources->gdcSync) wc_store_fence(); // Flush out WC write
         } else sub->posted += args->sliceSteps;
-        args->pattern = ncclPatternSend;
         sub->peer = resources->tpRemoteRank;
         for (uint64_t step=sub->posted-args->sliceSteps; step<sub->posted; step++) {
           ncclProfilingRecord(args, s, step, ncclProxyProfileSendGPUWait);
@@ -998,7 +996,6 @@ static ncclResult_t sendProxyProgress(struct ncclProxyState* proxyState, struct 
               // Make sure size is reset to zero before we update the head.
               __sync_synchronize();
               sub->transmitted += args->sliceSteps;
-              args->pattern = ncclPatternSend;
               sub->peer = resources->tpRemoteRank;
               sub->nbytes = size;
               for (uint64_t step=sub->transmitted-args->sliceSteps; step<sub->transmitted; step++) ncclProfilingRecord(args, s, step, ncclProxyProfileSendWait);
@@ -1016,9 +1013,8 @@ static ncclResult_t sendProxyProgress(struct ncclProxyState* proxyState, struct 
         if (done) {
           TRACE(NCCL_NET, "sendProxy [%ld/%d] request %p done", sub->done, buffSlot, sub->requests[buffSlot]);
           sub->done += args->sliceSteps;
-          args->pattern = ncclPatternSend;
           sub->peer = resources->tpRemoteRank;
-          for (uint64_t step=sub->done-args->sliceSteps; step<sub->done; step++) ncclProfilingRecord(args, s, step, ncclProxyProfileEnd);
+          for (uint64_t step=sub->done-args->sliceSteps; step<sub->done; step++) ncclProfilingRecord(args, s, step, ncclProxyProfileSendEnd);
 
           if (resources->shared == 0) {
             volatile uint64_t* sendHead = resources->gdcSync ? resources->gdcSync : &resources->sendMem->head;
@@ -1073,9 +1069,8 @@ static ncclResult_t recvProxyProgress(struct ncclProxyState* proxyState, struct 
       sub->base = ROUNDUP(resources->step, args->chunkSteps);
       sub->posted = sub->received = sub->transmitted = sub->done = 0;
       for (int i=0; i<groupSize; i++) sub[-i].groupSize = groupSize;
-      args->pattern = ncclPatternRecv;
       sub->peer = resources->tpRemoteRank;
-      for (uint64_t step=0; step<sub->nsteps; step++) ncclProfilingRecord(args, s, step, ncclProxyProfileBegin);
+      for (uint64_t step=0; step<sub->nsteps; step++) ncclProfilingRecord(args, s, step, ncclProxyProfileRecvBegin);
     }
     args->state = ncclProxyOpProgress;
   }
@@ -1122,7 +1117,6 @@ static ncclResult_t recvProxyProgress(struct ncclProxyState* proxyState, struct 
         void** requestPtr = subGroup->requests+(step%NCCL_STEPS);
         NCCLCHECK(proxyState->ncclNet->irecv(resources->netRecvComm, subCount, ptrs, sizes, tags, mhandles, requestPtr));
         if (*requestPtr) {
-          args->pattern = ncclPatternRecv;
           for (int i=0; i<subGroup->groupSize; i++) {
             struct ncclProxySubArgs* sub = subGroup+i;
             sub->posted += args->sliceSteps;
@@ -1149,7 +1143,6 @@ static ncclResult_t recvProxyProgress(struct ncclProxyState* proxyState, struct 
           int needFlush = 0;
           int totalSize = 0;
           for (int i=0; i<NCCL_PROXY_MAX_SUBS; i++) totalSize += sizes[i];
-          args->pattern = ncclPatternRecv;
           for (int i=0; i<subGroup->groupSize; i++) {
             struct ncclProxySubArgs* sub = subGroup + i;
             sub->received += args->sliceSteps;
@@ -1204,7 +1197,6 @@ static ncclResult_t recvProxyProgress(struct ncclProxyState* proxyState, struct 
         void* request = subGroup->requests[step%NCCL_STEPS];
         if (request) NCCLCHECK(proxyState->ncclNet->test(request, &done, NULL));
         if (done) {
-          args->pattern = ncclPatternRecv;
           for (int i=0; i<subGroup->groupSize; i++) {
             struct ncclProxySubArgs* sub = subGroup + i;
             sub->transmitted += args->sliceSteps;
@@ -1237,10 +1229,9 @@ static ncclResult_t recvProxyProgress(struct ncclProxyState* proxyState, struct 
               // LL and LL128 can acknowledge 0-bytes send before they even happen. Don't go past what we transmitted.
               sub->transmitted > sub->done) {
             sub->done += args->sliceSteps;
-            args->pattern = ncclPatternRecv;
             struct recvResources* resources = (struct recvResources*) (sub->connection->transportResources);
             sub->peer = resources->tpRemoteRank;
-            for (uint64_t step=sub->done-args->sliceSteps; step<sub->done; step++) ncclProfilingRecord(args, s+i, step, ncclProxyProfileEnd);
+            for (uint64_t step=sub->done-args->sliceSteps; step<sub->done; step++) ncclProfilingRecord(args, s+i, step, ncclProxyProfileRecvEnd);
             args->idle = 0;
             if (sub->done == sub->nsteps) {
               resources->step = sub->base + sub->nsteps;
