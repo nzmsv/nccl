@@ -10,28 +10,29 @@
 #include "proxy.h"
 
 enum ncclProxyProfileState {
-  ncclProxyProfileBegin = 0,
-
+  ncclProxyProfileSendBegin = 0,
   ncclProxyProfileSendGPUWait = 1,
   ncclProxyProfileSendWait = 2,
+  ncclProxyProfileSendEnd = 3,
 
-  ncclProxyProfileRecvWait = 1,
-  ncclProxyProfileRecvFlushWait = 2,
-  ncclProxyProfileRecvGPUWait = 3,
+  ncclProxyProfileRecvBegin = 8,
+  ncclProxyProfileRecvWait = 9,
+  ncclProxyProfileRecvFlushWait = 10,
+  ncclProxyProfileRecvGPUWait = 11,
+  ncclProxyProfileRecvEnd = 12,
 
-  ncclProxyProfileEnd = 4,
+  ncclProxyProfileSleep = 16,
+  ncclProxyProfileWakeup = 17,
 
-  ncclProxyProfileSleep = 8,
-  ncclProxyProfileWakeup = 9,
+  ncclProxyProfileIdle = 24,
+  ncclProxyProfileActive = 25,
 
-  ncclProxyProfileIdle = 16,
-  ncclProxyProfileActive = 17,
-
-  ncclProxyProfileAppend = 24,
-  ncclProxyProfileAppendEnd = 25
+  ncclProxyProfileAppend = 32,
+  ncclProxyProfileAppendEnd = 33
 };
 
-ncclResult_t ncclProfilingRecord(struct ncclProxyArgs* args, int sub, int step, int state);
+ncclResult_t ncclProfilingRecord(struct ncclProxyArgs* args, int sub, int step, enum ncclProxyProfileState state);
+
 void ncclProfilingDump();
 
 #endif
