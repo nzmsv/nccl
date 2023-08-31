@@ -5,7 +5,8 @@
 	DTRACE_PROBE12(nccl, name, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12)
 
 ncclResult_t ncclProfilingRecord(struct ncclProxyArgs* args, int sub, int step, enum ncclProxyProfileState state) {
-  if (state <= ncclProxyProfileRecvEnd) {
+  if (state <= ncclProxyProfileSendEnd) {
+  //if (state <= ncclProxyProfileRecvEnd) {
     USDT_PROBE12(sendrecv,
       state,
       args->comm,
